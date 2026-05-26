@@ -1,16 +1,13 @@
 library(ggplot2)
 library(dplyr)
-library(ggiraph)   # for interactive hover tooltips
+library(ggiraph)
 
-# ── Study anchor ───────────────────────────────────────────────────────────────
 study_start <- as.Date("2023-01-01")
 
-# Helper: add days to a subject's enrolment date and format nicely
 fmt_date <- function(enrol, day_offset) {
   format(as.Date(enrol) + day_offset, "%d %b %Y")
 }
 
-# ── Subject enrolment dates ────────────────────────────────────────────────────
 enrol <- c(
   "SUBJ-01" = "2023-01-05",
   "SUBJ-02" = "2023-01-10",
@@ -24,7 +21,13 @@ enrol <- c(
   "SUBJ-10" = "2023-05-10"
 )
 
-# ── Epochs (all days relative to subject day 0) ────────────────────────────────
+# ── enrol_df MUST come before any join that uses it ───────────────────────────
+enrol_df <- data.frame(
+  subject_id = names(enrol),
+  enrol_date = as.Date(enrol),
+  stringsAsFactors = FALSE
+)
+
 epochs <- tribble(
   ~subject_id,  ~epoch,        ~epoch_start, ~epoch_end,
   "SUBJ-01",    "Screening",    0,  13,
@@ -62,8 +65,6 @@ epochs <- tribble(
   "SUBJ-10",    "Follow-up",  123, 309
 )
 
-# ── Visits (start and end day per visit — realistic windows, not single days) ──
-# SUBJ-03 V3/V4 overlap and SUBJ-07 V5/V6 overlap are deliberate data errors
 visits <- tribble(
   ~subject_id,  ~visit, ~v_start, ~v_end,
   "SUBJ-01",    "V1",   0,   1,
@@ -73,23 +74,19 @@ visits <- tribble(
   "SUBJ-01",    "V5",  84,  88,
   "SUBJ-01",    "V6", 112, 114,
   "SUBJ-01",    "V7", 155, 158,
-  
   "SUBJ-02",    "V1",   0,   2,
   "SUBJ-02",    "V2",  14,  15,
   "SUBJ-02",    "V3",  28,  30,
   "SUBJ-02",    "V4",  56,  62,
-  
   "SUBJ-03",    "V1",   0,   2,
   "SUBJ-03",    "V2",  16,  18,
-  "SUBJ-03",    "V3",  31,  36,   # V3 end (day 36) overlaps V4 start (day 34) — data error
+  "SUBJ-03",    "V3",  31,  36,
   "SUBJ-03",    "V4",  34,  38,
   "SUBJ-03",    "V5",  87,  90,
   "SUBJ-03",    "V6", 118, 121,
   "SUBJ-03",    "V7", 158, 162,
-  
   "SUBJ-04",    "V1",   0,   1,
   "SUBJ-04",    "V2",  14,  15,
-  
   "SUBJ-05",    "V1",   0,   3,
   "SUBJ-05",    "V2",  14,  15,
   "SUBJ-05",    "V3",  29,  32,
@@ -97,31 +94,26 @@ visits <- tribble(
   "SUBJ-05",    "V5",  85,  88,
   "SUBJ-05",    "V6", 113, 119,
   "SUBJ-05",    "V7", 165, 170,
-  
   "SUBJ-06",    "V1",   0,   3,
   "SUBJ-06",    "V2",  15,  16,
   "SUBJ-06",    "V3",  30,  33,
   "SUBJ-06",    "V4",  58,  61,
   "SUBJ-06",    "V5",  86,  92,
-  
   "SUBJ-07",    "V1",   0,   2,
   "SUBJ-07",    "V2",  15,  17,
   "SUBJ-07",    "V3",  30,  33,
   "SUBJ-07",    "V4",  58,  61,
-  "SUBJ-07",    "V5",  86,  93,   # V5 end (day 93) overlaps V6 start (day 91) — data error
+  "SUBJ-07",    "V5",  86,  93,
   "SUBJ-07",    "V6",  91,  95,
   "SUBJ-07",    "V7", 168, 175,
-  
   "SUBJ-08",    "V1",   0,   1,
   "SUBJ-08",    "V2",  14,  16,
-  
   "SUBJ-09",    "V1",   0,   2,
   "SUBJ-09",    "V2",  14,  17,
   "SUBJ-09",    "V3",  29,  31,
   "SUBJ-09",    "V4",  57,  60,
   "SUBJ-09",    "V5",  85,  89,
   "SUBJ-09",    "V6", 113, 118,
-  
   "SUBJ-10",    "V1",   0,   1,
   "SUBJ-10",    "V2",  14,  16,
   "SUBJ-10",    "V3",  29,  31,
@@ -131,7 +123,6 @@ visits <- tribble(
   "SUBJ-10",    "V7", 166, 172
 )
 
-# ── Milestones ─────────────────────────────────────────────────────────────────
 milestones <- tribble(
   ~subject_id,  ~milestone,    ~m_day,
   "SUBJ-01",    "ICF1",         0,
@@ -169,7 +160,6 @@ milestones <- tribble(
   "SUBJ-10",    "End",        309
 )
 
-# ── Disposition ────────────────────────────────────────────────────────────────
 disposition <- tribble(
   ~subject_id,  ~end_day, ~disp_label,                       ~completed,
   "SUBJ-01",     181,      "Completed",                        TRUE,
@@ -184,6 +174,7 @@ disposition <- tribble(
   "SUBJ-10",     309,      "Completed",                        TRUE
 )
 
+# ── Now safe to join — enrol_df already exists ────────────────────────────────
 disposition <- disposition %>%
   left_join(enrol_df, by = "subject_id") %>%
   mutate(
@@ -195,23 +186,16 @@ disposition <- disposition %>%
     )
   )
 
-
-
-
-
-
-
-# ── Detect visit overlaps ──────────────────────────────────────────────────────
+# ── Detect visit overlaps ─────────────────────────────────────────────────────
 visits <- visits %>%
   group_by(subject_id) %>%
   arrange(v_start, .by_group = TRUE) %>%
   mutate(
-    prev_end  = lag(v_end, default = -1),
+    prev_end   = lag(v_end, default = -1),
     is_overlap = v_start <= prev_end
   ) %>%
   ungroup()
 
-# Mark both visits in each overlapping pair
 visits <- visits %>%
   group_by(subject_id) %>%
   mutate(
@@ -220,13 +204,7 @@ visits <- visits %>%
   ) %>%
   ungroup()
 
-# ── Attach enrolment date for tooltip date formatting ──────────────────────────
-enrol_df <- data.frame(
-  subject_id = names(enrol),
-  enrol_date = as.Date(enrol),
-  stringsAsFactors = FALSE
-)
-
+# ── Attach enrolment dates and tooltips ───────────────────────────────────────
 visits <- visits %>%
   left_join(enrol_df, by = "subject_id") %>%
   mutate(
@@ -255,7 +233,7 @@ epochs <- epochs %>%
     tooltip = paste0(subject_id, " · ", epoch, "\n", s_date, " → ", e_date)
   )
 
-# ── Subject ordering ───────────────────────────────────────────────────────────
+# ── Subject ordering ──────────────────────────────────────────────────────────
 subj_order <- disposition %>% arrange(end_day) %>% pull(subject_id)
 
 epochs      <- epochs      %>% mutate(subject_id = factor(subject_id, levels = subj_order))
@@ -263,7 +241,7 @@ visits      <- visits      %>% mutate(subject_id = factor(subject_id, levels = s
 milestones  <- milestones  %>% mutate(subject_id = factor(subject_id, levels = subj_order))
 disposition <- disposition %>% mutate(subject_id = factor(subject_id, levels = subj_order))
 
-# ── Colour / shape scales ──────────────────────────────────────────────────────
+# ── Colour / shape scales ─────────────────────────────────────────────────────
 epoch_colors <- c(
   "Screening"  = "#85B7EB",
   "Run-in"     = "#FCBBC7",
@@ -274,21 +252,23 @@ epoch_colors <- c(
 milestone_shapes <- c(ICF1 = 21, ICF2 = 22, Randomized = 24, End = 23)
 milestone_fills  <- c(ICF1 = "#B30B7E", ICF2 = "#B3700B", Randomized = "yellow", End = "#534AB7")
 
-# ── Build plot ─────────────────────────────────────────────────────────────────
+# ── Visit label colours — defined separately to avoid TRUE/FALSE conflict ─────
+visit_label_colours        <- ifelse(visits$flag_overlap, "#E24B4A", "#2742F5")
+disp_label_colours         <- ifelse(disposition$completed, "#0F6E56", "#A32D2D")
+
+# ── Build plot ────────────────────────────────────────────────────────────────
 p <- ggplot() +
   
-  # Epoch bars (interactive)
   geom_segment_interactive(
     data = epochs,
     aes(x = epoch_start, xend = epoch_end,
         y = subject_id,  yend = subject_id,
-        colour = epoch,
+        colour  = epoch,
         tooltip = tooltip,
         data_id = paste(subject_id, epoch)),
     linewidth = 5, lineend = "round"
   ) +
   
-  # Visit windows — normal visits (grey)
   geom_segment_interactive(
     data    = visits %>% filter(!flag_overlap),
     aes(x = v_start, xend = v_end,
@@ -300,7 +280,6 @@ p <- ggplot() +
     lineend   = "round"
   ) +
   
-  # Visit windows — overlapping visits (red)
   geom_segment_interactive(
     data    = visits %>% filter(flag_overlap),
     aes(x = v_start, xend = v_end,
@@ -312,26 +291,25 @@ p <- ggplot() +
     lineend   = "round"
   ) +
   
-  # Visit labels above bar
+  # Visit labels — colours set directly, no aes() mapping, avoids TRUE/FALSE clash
   geom_text(
     data  = visits,
     aes(x = (v_start + v_end) / 2,
         y = subject_id,
-        label = visit,
-        colour = !flag_overlap),
+        label = visit),
+    colour   = visit_label_colours,   # direct vector, not aes()
     vjust    = -1.6,
     size     = 4,
     fontface = "bold",
     show.legend = FALSE
   ) +
   
-  # Milestone markers (interactive)
   geom_point_interactive(
     data = milestones,
-    aes(x     = m_day,
-        y     = subject_id,
-        shape = milestone,
-        fill  = milestone,
+    aes(x       = m_day,
+        y       = subject_id,
+        shape   = milestone,
+        fill    = milestone,
         tooltip = tooltip,
         data_id = paste(subject_id, milestone)),
     size   = 3.2,
@@ -339,7 +317,6 @@ p <- ggplot() +
     stroke = 0.7
   ) +
   
-  # End-of-bar vertical tick — now interactive
   geom_point_interactive(
     data  = disposition,
     aes(x       = end_day,
@@ -349,25 +326,22 @@ p <- ggplot() +
     shape = 124, size = 5, colour = "grey30"
   ) +
   
-  # End-of-bar disposition label — now interactive
+  # Disposition labels — colours set directly, no aes() mapping
   geom_text_interactive(
     data  = disposition,
     aes(x       = end_day + 4,
         y       = subject_id,
         label   = disp_label,
-        colour  = completed,
         tooltip = tooltip,
         data_id = paste(subject_id, "end_label")),
-    hjust = 0, size = 5, show.legend = FALSE
+    colour = disp_label_colours,      # direct vector, not aes()
+    hjust  = 0,
+    size   = 5,
+    show.legend = FALSE
   ) +
   
-  # ── Scales ───────────────────────────────────────────────────────────────────
   scale_colour_manual(
-    values = c(
-      epoch_colors,
-      "TRUE"  = "#0F6E56",   # completed label
-      "FALSE" = "#A32D2D"    # discontinued label + overlap visit label
-    ),
+    values = epoch_colors,
     breaks = names(epoch_colors),
     name   = "Epoch (SE)"
   ) +
@@ -381,7 +355,9 @@ p <- ggplot() +
     expand = expansion(mult = c(0.01, 0))
   ) +
   
-  coord_cartesian(xlim = c(0, 420)) +
+  scale_y_discrete(expand = expansion(add = c(0.5, 1.2))) +
+  
+  coord_cartesian(xlim = c(0, 420), clip = "off") +
   
   labs(
     title    = "Swimmer Plot of Subjects' Disposition (DS), Study visits (SV) and Study Elements (SE) timing details",
@@ -404,7 +380,8 @@ p <- ggplot() +
     legend.title       = element_text(face = "bold", size = 14),
     legend.text        = element_text(size = 14),
     plot.title         = element_text(face = "bold", size = 15),
-    plot.subtitle      = element_text(colour = "grey40", size = 13),
+    plot.subtitle      = element_text(colour = "grey40", size = 13,
+                                      margin = margin(b = 15)),
     plot.margin        = margin(t = 6, r = 5, b = 10, l = 10)
   ) +
   
@@ -412,16 +389,14 @@ p <- ggplot() +
     colour = guide_legend(override.aes = list(linewidth = 4), order = 1),
     fill   = guide_legend(order = 2),
     shape  = guide_legend(order = 2)
-  ) +
-  
-  scale_y_discrete(expand = expansion(add = c(0.5, 1.2))) 
+  )
 
-# ── Render interactive plot ────────────────────────────────────────────────────
+# ── Render ────────────────────────────────────────────────────────────────────
 girafe(
-  ggobj  = p,
+  ggobj      = p,
   width_svg  = 14,
   height_svg = 7,
-  options = list(
+  options    = list(
     opts_tooltip(
       css     = "background:white;border:1px solid #ccc;padding:6px 10px;border-radius:6px;font-size:18px;font-family:sans-serif;white-space:pre;",
       opacity = 0.95
