@@ -424,7 +424,6 @@ build_plot <- function(ep, vi, mi, di) {
 # ══════════════════════════════════════════════════════════════════════════════
 ui <- fluidPage(
   
-  
   titlePanel("Swimmer Plot — Study Disposition Viewer (SDTM)"),
   
   sidebarLayout(
@@ -436,7 +435,7 @@ ui <- fluidPage(
         inputId  = "site",
         label    = "Site (SITEID):",
         choices  = c("All", sort(unique(dm$SITEID))),
-        selected = "703"
+        selected = "718"
       ),
       
       # ARM filter
@@ -531,15 +530,14 @@ server <- function(input, output, session) {
     req(nrow(d$di) > 0)
     
     n_subjects <- length(input$subjects)
-    
     # Calculate aspect ratio based on number of subjects
     # Width is fixed to container, height adjusts dynamically
     aspect_ratio <- max(0.3, min(1.5, n_subjects / 20))  # 20 subjects = 1:1 ratio
     
     girafe(
-      ggobj = build_plot(d$ep, d$vi, d$mi, d$di),
-      width_svg = 16,  # Base width in inches
-      height_svg = 16 * aspect_ratio,  # Height based on aspect ratio
+      ggobj      = build_plot(d$ep, d$vi, d$mi, d$di),
+      width_svg  = 18,
+      height_svg = 18*aspect_ratio,
       options    = list(
         opts_tooltip(
           css     = "background:white;border:1px solid #ccc;padding:6px 10px;
