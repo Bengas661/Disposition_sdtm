@@ -418,11 +418,55 @@ build_plot <- function(ep, vi, mi, di) {
       shape  = guide_legend(order = 2)
     )
 }
-
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 8 — Shiny UI
+# STEP 8 — Shiny UI (Modified for responsive scrolling)
 # ══════════════════════════════════════════════════════════════════════════════
 ui <- fluidPage(
+  
+  # Add CSS for responsive sizing
+  tags$head(
+    tags$style(HTML("
+      /* Make the graph container fill the width */
+      .girafe_container {
+        width: 100% !important;
+      }
+      
+      .girafe_container svg {
+        width: 100% !important;
+        height: auto !important;
+      }
+      
+      /* Allow vertical scrolling */
+      #swimmer_container {
+        width: 100%;
+        height: calc(100vh - 150px);  /* Full viewport height minus title/sidebar */
+        overflow-y: auto;              /* Enable vertical scrolling */
+        overflow-x: auto;              /* Enable horizontal scrolling if needed */
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      
+      /* Style the scrollbar */
+      #swimmer_container::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+      }
+      
+      #swimmer_container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+      
+      #swimmer_container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+      }
+      
+      #swimmer_container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+    "))
+  ),
   
   titlePanel("Swimmer Plot — Study Disposition Viewer (SDTM)"),
   
@@ -461,18 +505,34 @@ ui <- fluidPage(
       fluidRow(
         column(6, actionButton("select_all",   "Select all",   width = "100%")),
         column(6, actionButton("deselect_all", "Deselect all", width = "100%"))
+      ),
+      
+      hr(),
+      
+      # Add scroll info
+      div(
+        style = "background-color: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px;",
+        icon("info-circle"),
+        "Scroll vertically to see all subjects",
+        br(),
+        icon("arrows-alt"),
+        "Graph fills available width automatically"
       )
     ),
     
     mainPanel(
       width = 9,
-      girafeOutput("swimmer", width = "100%", height = "700px")
+      # Wrap the girafe output in a scrollable div
+      div(
+        id = "swimmer_container",
+        girafeOutput("swimmer", width = "100%", height = "auto")
+      )
     )
   )
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 9 — Shiny Server
+# STEP 9 — Shiny Server (Modified for responsive sizing)
 # ══════════════════════════════════════════════════════════════════════════════
 server <- function(input, output, session) {
   
@@ -524,21 +584,26 @@ server <- function(input, output, session) {
     )
   })
   
-  # ── Render plot ───────────────────────────────────────────────────────────
+  # ── Render plot (Modified for responsive sizing) ─────────────────────────
   output$swimmer <- renderGirafe({
     d <- filtered()
     req(nrow(d$di) > 0)
     
     n_subjects <- length(input$subjects)
-    # Calculate aspect ratio based on number of subjects
-    # Width is fixed to container, height adjusts dynamically
-    aspect_ratio <- max(0.3, min(1.5, n_subjects / 20))  # 20 subjects = 1:1 ratio
+    
+    # Calculate appropriate height based on number of subjects
+    # Each subject needs about 0.4 inches of vertical space
+    height_inches <- max(6, n_subjects * 0.4)
+    
+    # Width will be responsive (CSS will handle it)
+    # Set a reasonable base width that will scale
+    width_inches <- 16
     
     girafe(
-      ggobj      = build_plot(d$ep, d$vi, d$mi, d$di),
-      width_svg  = 18,
-      height_svg = 18*aspect_ratio,
-      options    = list(
+      ggobj = build_plot(d$ep, d$vi, d$mi, d$di),
+      width_svg = width_inches,
+      height_svg = height_inches,
+      options = list(
         opts_tooltip(
           css     = "background:white;border:1px solid #ccc;padding:6px 10px;
                      border-radius:6px;font-size:14px;
@@ -546,7 +611,7 @@ server <- function(input, output, session) {
           opacity = 0.95
         ),
         opts_hover(css = "opacity:0.75;cursor:crosshair;"),
-        opts_sizing(rescale = TRUE)
+        opts_sizing(rescale = TRUE, width = 1)  # Scale to 100% of container width
       )
     )
   })
