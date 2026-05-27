@@ -138,6 +138,7 @@ disposition_all <- ds %>%
   ) %>%
   filter(!is.na(end_day))
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 5 — DS: milestones (pre-processed once)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -149,17 +150,21 @@ milestones_all <- ds %>%
     dsstdy  = DSSTDY,
     dscat   = DSCAT
   ) %>%
-  filter(dsdecod %in% c(
-    "INFORMED CONSENT OBTAINED",
-    "RANDOMIZED",
-    "COMPLETED",
-    "PROTOCOL COMPLETED",
-    "SCREEN FAILURE",
-    "ADVERSE EVENT",
-    "STUDY TERMINATED BY SPONSOR",
-    "WITHDRAWAL BY SUBJECT",
-    "LOST TO FOLLOW-UP"
-  )) %>%
+  filter(
+    dscat == "DISPOSITION EVENT",
+    dsdecod %in% c(
+      "COMPLETED",
+      "ADVERSE EVENT",
+      "STUDY TERMINATED BY SPONSOR",
+      "SCREEN FAILURE",
+      "DEATH",
+      "WITHDRAWAL BY SUBJECT",
+      "PHYSICIAN DECISION",
+      "PROTOCOL VIOLATION",
+      "LOST TO FOLLOW-UP",
+      "LACK OF EFFICACY"
+    )
+  ) %>%
   mutate(dsstdtc = as.Date(dsstdtc)) %>%
   inner_join(day0_ref, by = "usubjid") %>%
   mutate(
@@ -169,15 +174,16 @@ milestones_all <- ds %>%
       TRUE ~ NA_real_
     ),
     milestone = case_when(
-      dsdecod == "INFORMED CONSENT OBTAINED"   ~ "ICF",
-      dsdecod == "RANDOMIZED"                  ~ "Randomized",
-      dsdecod %in% c("COMPLETED",
-                     "PROTOCOL COMPLETED")     ~ "End",
-      dsdecod == "SCREEN FAILURE"              ~ "Screen Failure",
+      dsdecod == "COMPLETED"                   ~ "Completed",
       dsdecod == "ADVERSE EVENT"               ~ "Adverse Event",
       dsdecod == "STUDY TERMINATED BY SPONSOR" ~ "Sponsor Decision",
+      dsdecod == "SCREEN FAILURE"              ~ "Screen Failure",
+      dsdecod == "DEATH"                       ~ "Death",
       dsdecod == "WITHDRAWAL BY SUBJECT"       ~ "Withdrew Consent",
+      dsdecod == "PHYSICIAN DECISION"          ~ "Physician Decision",
+      dsdecod == "PROTOCOL VIOLATION"          ~ "Protocol Violation",
       dsdecod == "LOST TO FOLLOW-UP"           ~ "Lost to Follow-up",
+      dsdecod == "LACK OF EFFICACY"            ~ "Lack of Efficacy",
       TRUE                                     ~ dsdecod
     ),
     tooltip = paste0(
@@ -205,27 +211,30 @@ epoch_colors <- setNames(
 )
 
 milestone_shapes <- c(
-  "ICF"               = 21,
-  "Randomized"        = 24,
-  "End"               = 23,
-  "Screen Failure"    = 4,
-  "Adverse Event"     = 25,
-  "Sponsor Decision"  = 22,
-  "Withdrew Consent"  = 9,
-  "Lost to Follow-up" = 8
+  "Completed"          = 23,
+  "Adverse Event"      = 25,
+  "Sponsor Decision"   = 22,
+  "Screen Failure"     = 4,
+  "Death"              = 8,
+  "Withdrew Consent"   = 21,
+  "Physician Decision" = 24,
+  "Protocol Violation" = 7,
+  "Lost to Follow-up"  = 1,
+  "Lack of Efficacy"   = 6
 )
 
 milestone_fills <- c(
-  "ICF"               = "#B30B7E",
-  "Randomized"        = "yellow",
-  "End"               = "#534AB7",
-  "Screen Failure"    = "#E24B4A",
-  "Adverse Event"     = "#EF9F27",
-  "Sponsor Decision"  = "#888780",
-  "Withdrew Consent"  = "#378ADD",
-  "Lost to Follow-up" = "#1D9E75"
+  "Completed"          = "#534AB7",
+  "Adverse Event"      = "#EF9F27",
+  "Sponsor Decision"   = "#888780",
+  "Screen Failure"     = "#E24B4A",
+  "Death"              = "#2C2C2A",
+  "Withdrew Consent"   = "#378ADD",
+  "Physician Decision" = "#85B7EB",
+  "Protocol Violation" = "#FCBBC7",
+  "Lost to Follow-up"  = "#1D9E75",
+  "Lack of Efficacy"   = "#B30B7E"
 )
-
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 7 — Plot-building function
 # ══════════════════════════════════════════════════════════════════════════════
@@ -355,7 +364,7 @@ build_plot <- function(ep, vi, mi, di) {
     scale_colour_manual(
       values = epoch_colors,
       breaks = names(epoch_colors),
-      name   = "EPOCH"
+      name   = "EPOCH (SE)"
     ) +
     
     scale_fill_manual(
@@ -406,8 +415,8 @@ build_plot <- function(ep, vi, mi, di) {
       legend.margin       = margin(b = 10),
       legend.title        = element_text(face = "bold", size = 12),
       legend.text         = element_text(size = 11),
-      plot.title          = element_text(face = "bold", size = 15),
-      plot.subtitle       = element_text(colour = "grey40", size = 11,
+      plot.title          = element_text(face = "bold", size = 18),
+      plot.subtitle       = element_text(colour = "grey40", size = 14,
                                          margin = margin(b = 15)),
       plot.margin         = margin(t = 6, r = 5, b = 10, l = 10)
     ) +
@@ -468,7 +477,7 @@ ui <- fluidPage(
     "))
   ),
   
-  titlePanel("Swimmer Plot — Study Disposition Viewer (SDTM)"),
+  titlePanel("Study Disposition Viewer (SDTM - CDISC Pilot Project Data)"),
   
   sidebarLayout(
     sidebarPanel(
@@ -477,15 +486,15 @@ ui <- fluidPage(
       # Site filter
       selectInput(
         inputId  = "site",
-        label    = "Site (SITEID):",
+        label    = "Site (DM.SITEID):",
         choices  = c("All", sort(unique(dm$SITEID))),
-        selected = "718"
+        selected = "All"
       ),
       
       # ARM filter
       selectInput(
         inputId  = "arm",
-        label    = "Treatment Arm (ACTARM):",
+        label    = "Treatment Arm (DM.ACTARM):",
         choices  = c("All", sort(unique(dm$ACTARM))),
         selected = "All"
       ),
