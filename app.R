@@ -211,7 +211,7 @@ milestone_shapes <- c(
   "Screen Failure"    = 4,
   "Adverse Event"     = 25,
   "Sponsor Decision"  = 22,
-  "Withdrew Consent"  = 7,
+  "Withdrew Consent"  = 9,
   "Lost to Follow-up" = 8
 )
 
