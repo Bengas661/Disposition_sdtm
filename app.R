@@ -4,6 +4,7 @@ library(ggiraph)
 library(lubridate)
 library(haven)
 library(shiny)
+library(tidyverse)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 0 — Load data (once, outside Shiny)
@@ -78,7 +79,11 @@ visits_all <- sv %>%
     svendtc     = as.Date(ifelse(is.na(svendtc) | svendtc == "",
                                  as.character(svstdtc),
                                  svendtc)),
-    visit_label = as.character(visitnum)
+    visit_label = ifelse(
+      visitnum == floor(visitnum),  # Check if it's a whole number
+      sprintf("%.0f", visitnum),     # Show without decimal: "1", "2", "3"
+      sprintf("%.1f", visitnum)      # Show with 1 decimal: "1.1", "2.1"
+    )
   ) %>%
   inner_join(day0_ref, by = "usubjid") %>%
   mutate(
@@ -127,7 +132,7 @@ disposition_all <- ds %>%
       !is.na(dsstdtc) & !is.na(day0) ~ as.numeric(dsstdtc - day0),
       TRUE ~ NA_real_
     ),
-    completed  = dsdecod %in% c("COMPLETED", "PROTOCOL COMPLETED"),
+    completed  = dsdecod %in% c("COMPLETED"),
     disp_label = paste0(dsdecod, " (", format(dsstdtc, "%d %b %Y"), ")"),
     tooltip    = paste0(
       usubjid, "\n",
@@ -150,21 +155,21 @@ milestones_all <- ds %>%
     dsstdy  = DSSTDY,
     dscat   = DSCAT
   ) %>%
-  filter(
-    dscat == "DISPOSITION EVENT",
-    dsdecod %in% c(
-      "COMPLETED",
-      "ADVERSE EVENT",
-      "STUDY TERMINATED BY SPONSOR",
-      "SCREEN FAILURE",
-      "DEATH",
-      "WITHDRAWAL BY SUBJECT",
-      "PHYSICIAN DECISION",
-      "PROTOCOL VIOLATION",
-      "LOST TO FOLLOW-UP",
-      "LACK OF EFFICACY"
-    )
-  ) %>%
+  # filter(
+  #   dscat == "DISPOSITION EVENT",
+  #   dsdecod %in% c(
+  #     "COMPLETED",
+  #     "ADVERSE EVENT",
+  #     "STUDY TERMINATED BY SPONSOR",
+  #     "SCREEN FAILURE",
+  #     "DEATH",
+  #     "WITHDRAWAL BY SUBJECT",
+  #     "PHYSICIAN DECISION",
+  #     "PROTOCOL VIOLATION",
+  #     "LOST TO FOLLOW-UP",
+  #     "LACK OF EFFICACY"
+  #   )
+  # ) %>%
   mutate(dsstdtc = as.Date(dsstdtc)) %>%
   inner_join(day0_ref, by = "usubjid") %>%
   mutate(
@@ -173,19 +178,7 @@ milestones_all <- ds %>%
       !is.na(dsstdtc) & !is.na(day0) ~ as.numeric(dsstdtc - day0),
       TRUE ~ NA_real_
     ),
-    milestone = case_when(
-      dsdecod == "COMPLETED"                   ~ "Completed",
-      dsdecod == "ADVERSE EVENT"               ~ "Adverse Event",
-      dsdecod == "STUDY TERMINATED BY SPONSOR" ~ "Sponsor Decision",
-      dsdecod == "SCREEN FAILURE"              ~ "Screen Failure",
-      dsdecod == "DEATH"                       ~ "Death",
-      dsdecod == "WITHDRAWAL BY SUBJECT"       ~ "Withdrew Consent",
-      dsdecod == "PHYSICIAN DECISION"          ~ "Physician Decision",
-      dsdecod == "PROTOCOL VIOLATION"          ~ "Protocol Violation",
-      dsdecod == "LOST TO FOLLOW-UP"           ~ "Lost to Follow-up",
-      dsdecod == "LACK OF EFFICACY"            ~ "Lack of Efficacy",
-      TRUE                                     ~ dsdecod
-    ),
+    milestone = str_to_title(dsdecod),
     tooltip = paste0(
       usubjid, " · ", milestone, "\n",
       "Date : ", format(dsstdtc, "%d %b %Y"), "\n",
@@ -211,29 +204,15 @@ epoch_colors <- setNames(
 )
 
 milestone_shapes <- c(
-  "Completed"          = 23,
-  "Adverse Event"      = 25,
-  "Sponsor Decision"   = 22,
-  "Screen Failure"     = 4,
-  "Death"              = 8,
-  "Withdrew Consent"   = 21,
-  "Physician Decision" = 24,
-  "Protocol Violation" = 7,
-  "Lost to Follow-up"  = 1,
-  "Lack of Efficacy"   = 6
+  "Completed"             = 23,
+  "Final Lab Visit"       = 25,
+  "Final Retrieval Visit" = 22
 )
 
 milestone_fills <- c(
   "Completed"          = "#534AB7",
-  "Adverse Event"      = "#EF9F27",
-  "Sponsor Decision"   = "#888780",
-  "Screen Failure"     = "#E24B4A",
-  "Death"              = "#2C2C2A",
-  "Withdrew Consent"   = "#378ADD",
-  "Physician Decision" = "#85B7EB",
-  "Protocol Violation" = "#FCBBC7",
-  "Lost to Follow-up"  = "#1D9E75",
-  "Lack of Efficacy"   = "#B30B7E"
+  "Final Lab Visit"      = "#EF9F27",
+  "Final Retrieval Visit"   = "#378ADD"
 )
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 7 — Plot-building function
@@ -369,16 +348,18 @@ build_plot <- function(ep, vi, mi, di) {
     
     scale_fill_manual(
       values = milestone_fills,
-      name   = "Disposition milestone (DS)"
+      name   = "Disposition milestone (DS)",
+      labels = c("Completed/Discontinued", "Final Lab Visit", "Final Retrieval Visit")
     ) +
     
     scale_shape_manual(
       values = milestone_shapes,
-      name   = "Disposition milestone (DS)"
+      name   = "Disposition milestone (DS)",
+      labels = c("Completed/Discontinued", "Final Lab Visit", "Final Retrieval Visit")
     ) +
     
     scale_x_continuous(
-      name     = "Days from Baseline (VISITNUM = 3, Day 0)",
+      name     = "Days from Baseline (VISITNUM = 3, Day 0 / DM.RFXSTDTC)",
       breaks   = seq(x_min, ceiling(x_max / 28) * 28, by = 28),
       expand   = expansion(mult = c(0.01, 0)),
       position = "top"
@@ -395,7 +376,8 @@ build_plot <- function(ep, vi, mi, di) {
       title    = "Swimmer Plot — Disposition (DS), Study Visits (SV) and Study Elements (SE)",
       subtitle = paste0(
         "Dashed line = Day 0 (Baseline)\n  ",
-        "Red bars = visit overlap\n",
+        "Numbers above bars: VISITNUM values (SV)\n  ",
+        "Red bars = visit overlap (data/programming issue)\n",
         "Green label = Completed  /  Red label = Discontinued"
       ),
       y = NULL
@@ -407,14 +389,14 @@ build_plot <- function(ep, vi, mi, di) {
       panel.grid.major.y  = element_blank(),
       panel.grid.minor    = element_blank(),
       panel.grid.major.x  = element_line(colour = "grey92", linewidth = 0.4),
-      axis.text.x.top     = element_text(size = 12),
-      axis.title.x.top    = element_text(size = 12, margin = margin(b = 8)),
+      axis.text.x.top     = element_text(size = 13,colour = "#3D0BB3"),
+      axis.title.x.top    = element_text(size = 14,margin = margin(b = 8)),
       axis.text.y         = element_text(size = 11),
       legend.position     = "top",
       legend.box          = "vertical",
       legend.margin       = margin(b = 10),
-      legend.title        = element_text(face = "bold", size = 12),
-      legend.text         = element_text(size = 11),
+      legend.title        = element_text(face = "bold", size = 16),
+      legend.text         = element_text(size = 14),
       plot.title          = element_text(face = "bold", size = 18),
       plot.subtitle       = element_text(colour = "grey40", size = 14,
                                          margin = margin(b = 15)),
@@ -501,12 +483,20 @@ ui <- fluidPage(
       
       hr(),
       
-      # Subject filter — updated dynamically based on site/arm
-      checkboxGroupInput(
+      #Subject filter — updated dynamically based on site/arm
+      # checkboxGroupInput(
+      #   inputId  = "subjects",
+      #   label    = "Subjects (USUBJID):",
+      #   choices  = sort(unique(dm$USUBJID)),
+      #   selected = sort(unique(dm$USUBJID))
+      # ),
+
+      selectInput(
         inputId  = "subjects",
         label    = "Subjects (USUBJID):",
         choices  = sort(unique(dm$USUBJID)),
-        selected = sort(unique(dm$USUBJID))
+        selected = sort(unique(dm$USUBJID)),
+        multiple = TRUE
       ),
       
       hr(),
@@ -561,7 +551,7 @@ server <- function(input, output, session) {
   # ── Update subject checkboxes when site or arm changes ───────────────────
   observeEvent(available_subjects(), {
     avail <- available_subjects()
-    updateCheckboxGroupInput(session, "subjects",
+    updateSelectInput(session, "subjects",           #updateCheckboxGroupInput
                              choices  = avail,
                              selected = avail
     )
