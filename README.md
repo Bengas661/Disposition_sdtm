@@ -12,7 +12,7 @@ A single-view exploration tool for subject disposition data, designed to streaml
 
 ## Rationale
 
-Exploring subject disposition data often requires navigating multiple SDTM datasets. This application consolidates key information into one interface, enabling faster and more intuitive review of subject-level outcomes.
+Exploring subject disposition data often requires navigating multiple SDTM datasets at the same time. This application consolidates key information into one interface, enabling faster and more intuitive review of subject-level outcomes.
 
 ---
 
@@ -29,7 +29,7 @@ Exploring subject disposition data often requires navigating multiple SDTM datas
 
 This application uses **CDISC Pilot Study SDTM data**.
 
-🔗 [CDISC SDTM/ADaM Pilot Project](https://github.com/cdisc-org/sdtm-adam-pilot-project)
+🔗 [CDISC Pilot Project](https://github.com/cdisc-org/sdtm-adam-pilot-project)
 
 ---
 
@@ -42,29 +42,6 @@ This application uses **CDISC Pilot Study SDTM data**.
 ## Source Code
 
 📁 [View Repository](https://github.com/Bengas661/Disposition_sdtm)
-
----
-
-## Getting Started
-
-To run the app locally, clone the repository and launch it in R:
-
-```r
-# Clone the repository
-# git clone https://github.com/Bengas661/Disposition_sdtm.git
-
-# Install required packages (if needed)
-# install.packages(c("shiny", "..."))
-
-# Run the app
-shiny::runApp()
-```
-
----
-
-## Contributing
-
-Contributions, issues, and feature requests are welcome. Feel free to open an issue or submit a pull request.
 
 ---
 
