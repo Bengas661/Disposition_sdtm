@@ -1,0 +1,13 @@
+name: disposition
+title: disposition
+username: ioannis-elmatzoglou
+account: ioannis-elmatzoglou
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17432627
+bundleId: 12050651
+url: https://ioannis-elmatzoglou.shinyapps.io/disposition/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: last vers/appww.R|phuse-scripts

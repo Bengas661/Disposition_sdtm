@@ -9,7 +9,7 @@ library(tidyverse)
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 0 — Load data (once, outside Shiny)
 # ══════════════════════════════════════════════════════════════════════════════
-setwd("C:/Users/user/Desktop/shiny_apps/sdtm app")
+#setwd("C:/Users/user/Desktop/shiny_apps/sdtm app")
 
 dm <- read_xpt("dm.xpt")
 ds <- read_xpt("ds.xpt")
@@ -597,7 +597,7 @@ server <- function(input, output, session) {
     
     # Calculate appropriate height based on number of subjects
     # Each subject needs about 0.4 inches of vertical space
-    height_inches <- max(6, n_subjects * 0.4)
+    height_inches <- max(6, 4 + n_subjects * 0.4)
     
     # Width will be responsive (CSS will handle it)
     # Set a reasonable base width that will scale
